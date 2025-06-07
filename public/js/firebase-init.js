@@ -1,6 +1,6 @@
 /* /public/js/firebase-init.js   (all pages will share this) */
 import { initializeApp }   from "https://www.gstatic.com/firebasejs/11.9.0/firebase-app.js";
-import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/11.9.0/firebase-auth.js";
+import { getAuth, signInAnonymously, setPersistence, browserSessionPersistence} from "https://www.gstatic.com/firebasejs/11.9.0/firebase-auth.js";
 import { getFirestore       } from "https://www.gstatic.com/firebasejs/11.9.0/firebase-firestore.js";
 
 const firebaseConfig = {
@@ -17,4 +17,6 @@ export const app  = initializeApp(firebaseConfig);
 export const db   = getFirestore(app);
 export const auth = getAuth(app);
 
+// One UID per tab ‒ good for local testing
+await setPersistence(auth, browserSessionPersistence);
 signInAnonymously(auth).catch(console.error);
