@@ -1,59 +1,73 @@
+/* /public/js/join.js  —  v2 */
 import { db, auth } from "./firebase-init.js";
+import { onAuthStateChanged }
+  from "https://www.gstatic.com/firebasejs/11.9.0/firebase-auth.js";
+
 import {
   collection, query, where, orderBy, limit,
-  onSnapshot, addDoc, serverTimestamp, updateDoc
+  onSnapshot, addDoc, updateDoc, doc, serverTimestamp
 } from "https://www.gstatic.com/firebasejs/11.9.0/firebase-firestore.js";
 
-// ---------- helpers ----------
-function $(sel) { return document.querySelector(sel); }
-function el(tag, txt) {
-  const e = document.createElement(tag);
-  if (txt) e.textContent = txt;
-  return e;
-}
+/* ---------------- little DOM helpers ---------------- */
+const $  = sel => document.querySelector(sel);
+const el = (tag, txt) => Object.assign(document.createElement(tag), { textContent: txt });
 
-// ---------- UI ----------
+/* ---------------- page skeleton ---------------- */
 const root = $("#root");
 
-// 1. render "Create room" form
+/* --  Create-room form  -- */
 const form = el("form");
 form.innerHTML = `
-  <input required name="roomName" placeholder="Room name" />
-  <input required name="userName" placeholder="Your nickname" />
+  <input name="roomName" placeholder="Room name" required />
+  <input name="userName" placeholder="Your nickname" required />
   <button>Create room</button>
 `;
 root.appendChild(form);
 
-// 2. list of rooms
+/* --  Live list of open rooms  -- */
 const list = el("div");
 root.appendChild(list);
 
-// ---------- Firestore live query ----------
+/* ---------------- Firestore query ---------------- */
 const roomsQ = query(
   collection(db, "rooms"),
   where("started", "==", false),
   orderBy("createdAt", "desc"),
   limit(30)
 );
+
 onSnapshot(roomsQ, snap => {
-  list.innerHTML = "";                       // clear list
-  snap.forEach(doc => {
-    const data = doc.data();
+  list.innerHTML = "";                    // wipe and rebuild
+  if (snap.empty) { list.textContent = "No open rooms."; return; }
+
+  snap.forEach(docSnap => {
+    const d = docSnap.data();
     const btn = el("button",
-      `${data.name} (${Object.keys(data.players).length} players)`
+      `${d.name} (${Object.keys(d.players).length} players)`
     );
-    btn.onclick = () => joinRoom(doc.id, data);
+    btn.onclick = () => joinRoom(docSnap.id);
     list.appendChild(btn);
   });
-  if (snap.empty) list.textContent = "No open rooms.";
 });
 
-// ---------- handlers ----------
+/* ---------------- helpers ---------------- */
+function waitForUid() {
+  // returns a Promise that resolves to the user’s uid once sign-in is done
+  if (auth.currentUser) return Promise.resolve(auth.currentUser.uid);
+  return new Promise(resolve => {
+    const unsub = onAuthStateChanged(auth, user => {
+      if (user) { unsub(); resolve(user.uid); }
+    });
+  });
+}
+
+/* ---------------- handlers ---------------- */
 form.onsubmit = async e => {
   e.preventDefault();
   const { roomName, userName } = Object.fromEntries(new FormData(form));
-  const uid = auth.currentUser.uid;
-  const docRef = await addDoc(collection(db, "rooms"), {
+
+  const uid = await waitForUid();           // <- key line
+  const ref = await addDoc(collection(db, "rooms"), {
     name: roomName,
     createdBy: uid,
     createdAt: serverTimestamp(),
@@ -61,15 +75,16 @@ form.onsubmit = async e => {
     started: false,
     players: { [uid]: userName }
   });
-  location.href = `/lobby.html?room=${docRef.id}`;
+  location.href = `/lobby.html?room=${ref.id}`;
 };
 
-async function joinRoom(roomId, roomData) {
-  const userName = prompt("Choose a nickname:");
-  if (!userName) return;
-  const uid = auth.currentUser.uid;
+async function joinRoom(roomId) {
+  const nick = prompt("Choose a nickname:");
+  if (!nick) return;
+
+  const uid = await waitForUid();           // <- key line
   await updateDoc(doc(db, "rooms", roomId), {
-    [`players.${uid}`]: userName,
+    [`players.${uid}`]: nick,
     lastActivity: serverTimestamp()
   });
   location.href = `/lobby.html?room=${roomId}`;
