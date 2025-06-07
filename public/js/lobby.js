@@ -1,73 +1,77 @@
+/* /public/js/lobby.js  – Phase 2 */
 import { db, auth } from "./firebase-init.js";
+import { onAuthStateChanged }
+  from "https://www.gstatic.com/firebasejs/11.9.0/firebase-auth.js";
 import {
-  doc, onSnapshot, updateDoc, serverTimestamp, deleteField
+  doc, onSnapshot, updateDoc, deleteField, serverTimestamp
 } from "https://www.gstatic.com/firebasejs/11.9.0/firebase-firestore.js";
 
+/* --- leave-confirm prompt --- */
+window.addEventListener("beforeunload", e => { e.preventDefault(); e.returnValue = ""; });
 
-// ---- warn if the user tries to close / reload ----
-window.addEventListener("beforeunload", e => {
-  e.preventDefault();            // required for Chrome ≤ 117
-  e.returnValue = "";            // show default browser message
-});
-
-
-const params = new URLSearchParams(location.search);
-const roomId = params.get("room");
+/* --- params & refs --- */
+const roomId = new URLSearchParams(location.search).get("room");
 if (!roomId) location.href = "/join.html";
+const roomRef = doc(db, "rooms", roomId);
 
+let myUid = null;
+onAuthStateChanged(auth, u => myUid = u?.uid ?? null);
+
+/* --- live lobby --- */
 const title = document.querySelector("#title");
 const root  = document.querySelector("#root");
 
-const roomRef = doc(db, "rooms", roomId);
-
 onSnapshot(roomRef, snap => {
-  if (!snap.exists()) {
-    root.textContent = "Room no longer exists.";
+  if (!snap.exists()) { root.textContent = "Room deleted"; return; }
+  const d = snap.data();
+
+  /* phase switch */
+  if (d.phase === "roleReveal") {
+    location.href = `/game.html?room=${roomId}`;
     return;
   }
-  const data = snap.data();
-  title.textContent = `Lobby: ${data.name}`;
 
-  // ------- player list -------
+  title.textContent = `Lobby: ${d.name}`;
   root.innerHTML = "<h3>Players:</h3>";
   const ul = document.createElement("ul");
-  for (const nick of Object.values(data.players)) {
-    const li = document.createElement("li");
-    li.textContent = nick;
-    ul.appendChild(li);
-  }
+  Object.values(d.players).forEach(nick => {
+    const li = document.createElement("li"); li.textContent = nick; ul.appendChild(li);
+  });
   root.appendChild(ul);
 
-  // ------- start button for owner -------
-  if (auth.currentUser.uid === data.createdBy) {
+  if (myUid === d.createdBy) {
     let btn = document.querySelector("#startBtn");
-    if (!btn) {
-      btn = document.createElement("button");
-      btn.id = "startBtn";
-      root.appendChild(btn);
-    }
-    btn.disabled = Object.keys(data.players).length < 5;
-    btn.textContent = btn.disabled
-      ? "Need at least 5 players"
-      : "Start game";
-    btn.onclick = startGame;
+    if (!btn) { btn = document.createElement("button"); btn.id = "startBtn"; root.appendChild(btn); }
+    btn.disabled = Object.keys(d.players).length < 5;
+    btn.textContent = btn.disabled ? "Need at least 5 players" : "Start game";
+    btn.onclick = () => startGame(d.players);
   }
 });
 
-/* ----- auto-cleanup if the tab is closed ----- */
-function removeSelfFromRoom() {
-  if (!auth.currentUser) return;               // just in case
-  updateDoc(roomRef, {
-    [`players.${auth.currentUser.uid}`]: deleteField(),
-    lastActivity: serverTimestamp()
-  }).catch(console.error);
-}
-
-async function startGame() {
+/* --- start game: assign roles & advance phase --- */
+async function startGame(players) {
+  /* 1. work out spies vs resistance */
+  const uids = Object.keys(players);
+  const n = uids.length;
+  const spiesNeeded = [0,0,0,2,2,3,3,3,3,4][n];  // index 5-10 → spy count
+  /* 2. shuffle uids */
+  uids.sort(() => Math.random() - 0.5);
+  const roles = {};
+  uids.forEach((uid,i) => roles[uid] = i < spiesNeeded ? "spy" : "resistance");
+  /* 3. commit to Firestore */
   await updateDoc(roomRef, {
-    started: true,
+    roles,
+    phase: "roleReveal",
     lastActivity: serverTimestamp()
   });
-  // (later we'll redirect to /game.html)
-  alert("Game start stub – next step!");
 }
+
+/* --- auto-remove on close --- */
+function leave() {
+  if (!myUid) return;
+  updateDoc(roomRef, {
+    [`players.${myUid}`]: deleteField(),
+    lastActivity: serverTimestamp()
+  }).catch(()=>{});
+}
+addEventListener("pagehide", leave);
