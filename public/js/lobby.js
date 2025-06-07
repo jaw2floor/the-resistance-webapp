@@ -1,7 +1,15 @@
 import { db, auth } from "./firebase-init.js";
 import {
-  doc, onSnapshot, updateDoc, serverTimestamp
+  doc, onSnapshot, updateDoc, serverTimestamp, deleteField
 } from "https://www.gstatic.com/firebasejs/11.9.0/firebase-firestore.js";
+
+
+// ---- warn if the user tries to close / reload ----
+window.addEventListener("beforeunload", e => {
+  e.preventDefault();            // required for Chrome ≤ 117
+  e.returnValue = "";            // show default browser message
+});
+
 
 const params = new URLSearchParams(location.search);
 const roomId = params.get("room");
@@ -45,6 +53,15 @@ onSnapshot(roomRef, snap => {
     btn.onclick = startGame;
   }
 });
+
+/* ----- auto-cleanup if the tab is closed ----- */
+function removeSelfFromRoom() {
+  if (!auth.currentUser) return;               // just in case
+  updateDoc(roomRef, {
+    [`players.${auth.currentUser.uid}`]: deleteField(),
+    lastActivity: serverTimestamp()
+  }).catch(console.error);
+}
 
 async function startGame() {
   await updateDoc(roomRef, {
