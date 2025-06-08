@@ -50,20 +50,48 @@ onSnapshot(roomRef, snap => {
 
 /* --- start game: assign roles & advance phase --- */
 async function startGame(players) {
-  /* 1. work out spies vs resistance */
+  // 1. A clearer way to define spy counts
+  const spiesByPlayerCount = {
+    5: 2,
+    6: 2, // Corrected from your original (was effectively 3)
+    7: 3,
+    8: 3,
+    9: 3,
+    10: 4,
+  };
+
   const uids = Object.keys(players);
   const n = uids.length;
-  const spiesNeeded = [0,0,0,2,2,3,3,3,3,4][n];  // index 5-10 → spy count
-  /* 2. shuffle uids */
+  const spiesNeeded = spiesByPlayerCount[n];
+
+  // 2. Add a safeguard for invalid player counts
+  if (spiesNeeded === undefined) {
+    alert(`Error: Cannot start a game with ${n} players.`);
+    console.error(`Invalid number of players: ${n}`);
+    return;
+  }
+
+  // 3. Shuffle UIDs and assign roles
   uids.sort(() => Math.random() - 0.5);
   const roles = {};
-  uids.forEach((uid,i) => roles[uid] = i < spiesNeeded ? "spy" : "resistance");
-  /* 3. commit to Firestore */
-  await updateDoc(roomRef, {
-    roles,
-    phase: "roleReveal",
-    lastActivity: serverTimestamp()
+  uids.forEach((uid, i) => {
+    roles[uid] = i < spiesNeeded ? "spy" : "resistance";
   });
+
+  // 4. Commit to Firestore with proper error handling
+  try {
+    await updateDoc(roomRef, {
+      roles,
+      phase: "roleReveal",
+      lastActivity: serverTimestamp(),
+    });
+    // The onSnapshot listener will handle the redirect automatically
+  } catch (error) {
+    // This will catch any errors (e.g., from security rules)
+    // and show them to the user instead of hanging.
+    console.error("Failed to start game:", error);
+    alert("Failed to start the game. Please check the developer console for errors.");
+  }
 }
 
 /* --- auto-remove on close --- */

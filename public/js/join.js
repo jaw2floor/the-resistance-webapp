@@ -5,7 +5,7 @@ import { onAuthStateChanged }
 
 import {
   collection, query, where, orderBy, limit,
-  onSnapshot, addDoc, updateDoc, doc, serverTimestamp
+  onSnapshot, addDoc, getDocs , deleteDoc, updateDoc, doc, serverTimestamp, Timestamp
 } from "https://www.gstatic.com/firebasejs/11.9.0/firebase-firestore.js";
 
 /* ---------------- little DOM helpers ---------------- */
@@ -23,24 +23,55 @@ form.innerHTML = `
   <button>Create room</button>
 `;
 root.appendChild(form);
+/* --  purge >15m midle rooms   --*/
+async function cleanupStaleRooms() {
+  const cutoff = new Date(Date.now() - 15 * 60 * 1000); // 15 minutes ago
+  const staleQ = query(
+    collection(db, "rooms"),
+    where("started", "==", false),
+    where("createdAt", "<=", cutoff)
+  );
+  const snap = await getDocs(staleQ);
+  const deletes = snap.docs.map(d => deleteDoc(d.ref));
+  await Promise.all(deletes);
+}
+
+// Run it once on page load
+cleanupStaleRooms().catch(console.error);
+
 
 /* --  Live list of open rooms  -- */
 const list = el("div");
 root.appendChild(list);
 
 /* ---------------- Firestore query ---------------- */
+//only rooms <15 mins old
+const fifteenAgo = Timestamp.fromMillis(Date.now() - 15 * 60 * 1000);
 const roomsQ = query(
   collection(db, "rooms"),
   where("started", "==", false),
+  where("createdAt", ">", fifteenAgo),   // ← new filter
   orderBy("createdAt", "desc"),
   limit(30)
 );
+
+async function maybeDeleteExpired(docSnap) {
+  const d = docSnap.data();
+  if (d.started) return;                           // already in game → keep
+  const age = Date.now() - d.createdAt.toMillis();
+  if (age < 15 * 60 * 1000) return;               // younger than 15 min → keep
+  if (auth.currentUser.uid !== d.createdBy) return; // only owner cleans up
+  try { await deleteDoc(docSnap.ref); }
+  catch (err) { console.error("GC delete failed:", err); }
+}
+
 
 onSnapshot(roomsQ, snap => {
   list.innerHTML = "";                    // wipe and rebuild
   if (snap.empty) { list.textContent = "No open rooms."; return; }
 
   snap.forEach(docSnap => {
+    maybeDeleteExpired(docSnap);
     const d = docSnap.data();
     const btn = el("button",
       `${d.name} (${Object.keys(d.players).length} players)`
@@ -71,6 +102,7 @@ form.onsubmit = async e => {
     name: roomName,
     createdBy: uid,
     createdAt: serverTimestamp(),
+    expiresAt: Timestamp.fromMillis(Date.now() + 15 * 60 * 1000),
     lastActivity: serverTimestamp(),
     started: false,
     players: { [uid]: userName }
@@ -85,7 +117,8 @@ async function joinRoom(roomId) {
   const uid = await waitForUid();           // <- key line
   await updateDoc(doc(db, "rooms", roomId), {
     [`players.${uid}`]: nick,
-    lastActivity: serverTimestamp()
+    lastActivity: serverTimestamp(),
+    expiresAt: Timestamp.fromMillis(Date.now() + 15 * 60 * 1000),
   });
   location.href = `/lobby.html?room=${roomId}`;
 }
