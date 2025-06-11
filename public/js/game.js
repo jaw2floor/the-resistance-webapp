@@ -1,44 +1,148 @@
-/* /public/js/game.js – v2 */
+/* /public/js/game.js – Phase 3 */
 import { db, auth } from "./firebase-init.js";
 import { onAuthStateChanged }
   from "https://www.gstatic.com/firebasejs/11.9.0/firebase-auth.js";
-import { doc, onSnapshot }
-  from "https://www.gstatic.com/firebasejs/11.9.0/firebase-firestore.js";
+import {
+  doc, onSnapshot, updateDoc, deleteField, serverTimestamp
+} from "https://www.gstatic.com/firebasejs/11.9.0/firebase-firestore.js";
 
-const roomRef = doc(db, "rooms", new URLSearchParams(location.search).get("room"));
-const roleDiv = document.querySelector("#role");
-const contBtn = document.querySelector("#continue");
+const roomId  = new URLSearchParams(location.search).get("room");
+const roomRef = doc(db, "rooms", roomId);
 
-let myUid = null;
-let roomData = null;
+/* ---------- cached state ---------- */
+let me, data;
 
-/* ----- helper renders only when both pieces are ready ----- */
+/* ---------- elements ---------- */
+const roleDiv   = $("#role");
+const contBtn   = $("#continue");
+const board     = $("#board");
+const missionNo = $("#missionNo");
+const leaderNm  = $("#leaderName");
+const leaderPan = $("#leaderPanel");
+const neededSP  = $("#needed");
+const checkBoxC = $("#playersChecklist");
+const proposeBt = $("#proposeBtn");
+const votePan   = $("#votePanel");
+const teamList  = $("#teamList");
+const approveBt = $("#approveBtn");
+const rejectBt  = $("#rejectBtn");
+const statusP   = $("#status");
+
+/* ---------- tiny helpers ---------- */
+function $(sel){ return document.querySelector(sel); }
+const uidName = uid => data.players[uid] || uid;
+
+/* ---------- role reveal first ---------- */
 function maybeShowRole() {
-  if (!myUid || !roomData || !roomData.roles) return;
-  const myRole = roomData.roles[myUid];
-  if (!myRole) return;                       // roles not written yet
+  if (!me || !data?.roles) return;
+  const myRole = data.roles[me];
+  if (!myRole) return;
 
-  roleDiv.textContent = `You are a ${myRole.toUpperCase()} ${
-    myRole === "spy" ? "🤫" : "💙"
-  }`;
-  roleDiv.className = myRole === "spy" ? "spy" : "resistance";
+  roleDiv.textContent =
+    `You are a ${myRole.toUpperCase()} ${myRole==="spy"?"🤫":"💙"}`;
+  roleDiv.className = myRole;
   contBtn.hidden = false;
 }
 
-/* ----- listeners ----- */
-onAuthStateChanged(auth, user => {
-  myUid = user?.uid ?? null;
-  maybeShowRole();
-});
+onAuthStateChanged(auth, u => { me=u?.uid; maybeShowRole(); });
+onSnapshot(roomRef, snap => { data = snap.data(); maybeShowRole(); });
 
+/* ---------- click continue → show board ---------- */
+contBtn.onclick = () => {
+  roleDiv.hidden = contBtn.hidden = true;
+  board.hidden = false;
+  renderBoard();
+};
+
+/* ---------- main board renderer ---------- */
+function renderBoard(){
+  missionNo.textContent = data.mission;
+  leaderNm.textContent  = uidName(data.leaderUid);
+
+  const playersArr = Object.entries(data.players); // [uid,nick]
+
+  /* --- Leader view (only until a team is proposed) --- */
+  if (me === data.leaderUid && data.proposedTeam.length === 0) {
+    leaderPan.hidden = false;
+    votePan.hidden   = true;
+    const teamSize = missionTeamSize(playersArr.length, data.mission);
+    neededSP.textContent = teamSize;
+
+    // rebuild checklist
+    checkBoxC.innerHTML = "";
+    playersArr.forEach(([uid,nick])=>{
+      const lab=document.createElement("label");
+      lab.innerHTML=`
+        <input type="checkbox" value="${uid}">
+        ${nick}
+      `;
+      checkBoxC.appendChild(lab);
+    });
+
+    checkBoxC.onchange = () => {
+      const sel = [...checkBoxC.querySelectorAll("input:checked")];
+      proposeBt.disabled = sel.length !== teamSize;
+    };
+
+    proposeBt.onclick = async () => {
+      const sel = [...checkBoxC.querySelectorAll("input:checked")].map(i=>i.value);
+      await updateDoc(roomRef,{
+        proposedTeam: sel,
+        votes: {},                      // reset votes
+        voteRound: (data.voteRound||1),
+        lastActivity: serverTimestamp()
+      });
+    };
+  }
+  /* --- Voting view --- */
+  else if (data.proposedTeam.length){
+    leaderPan.hidden = true;
+    votePan.hidden   = false;
+    teamList.textContent = `Proposed team: ${
+      data.proposedTeam.map(uidName).join(", ")
+    }`;
+
+    // disable buttons if I've already voted
+    const voted = data.votes && data.votes[me]!==undefined;
+    approveBt.disabled = rejectBt.disabled = voted;
+
+    approveBt.onclick = () => castVote(true);
+    rejectBt.onclick  = () => castVote(false);
+  }else{
+    leaderPan.hidden = votePan.hidden = true;
+    statusP.textContent = "Waiting for leader to propose a team…";
+  }
+
+  // live vote tally
+  if (data.votes && Object.keys(data.votes).length){
+    const yes = Object.values(data.votes).filter(v=>v).length;
+    const total = Object.keys(data.players).length;
+    statusP.textContent = `Votes so far: ${yes}/${total} approve`;
+  }
+}
+
+/* ---------- helper functions ---------- */
+function missionTeamSize(playerCount, mission){
+  // table per rules
+  const tbl = {
+    5: [0,2,3,2,3,3],
+    6: [0,2,3,4,3,4],
+    7: [0,2,3,3,4,4],
+    8: [0,3,4,4,5,5],
+    9: [0,3,4,4,5,5],
+   10: [0,3,4,4,5,5]
+  };
+  return tbl[playerCount][mission];
+}
+
+async function castVote(approve){
+  await updateDoc(roomRef, {
+    [`votes.${me}`]: approve,
+    lastActivity: serverTimestamp()
+  });
+}
+
+/* ---------- keep board live ---------- */
 onSnapshot(roomRef, snap => {
-  if (!snap.exists()) { roleDiv.textContent = "Room deleted"; return; }
-  roomData = snap.data();
-  maybeShowRole();
+  if (!board.hidden){ data = snap.data(); renderBoard(); }
 });
-
-/* ----- next-phase placeholder ----- */
-contBtn.onclick = () => alert("Team-building phase coming soon!");
-
-/* later contBtn will move to the board; for now just a placeholder */
-contBtn.onclick = () => alert("Next phase coming soon!");

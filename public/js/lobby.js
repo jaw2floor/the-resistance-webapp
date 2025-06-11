@@ -84,6 +84,11 @@ async function startGame(players) {
       roles,
       phase: "roleReveal",
       lastActivity: serverTimestamp(),
+      mission: 1,
+      voteRound: 1,
+      leaderUid: uids[0],
+      proposedTeam: [],
+      votes: {},
     });
     // The onSnapshot listener will handle the redirect automatically
   } catch (error) {

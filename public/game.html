@@ -19,5 +19,25 @@
 </head><body>
   <h1>The Resistance</h1>
   <div id="role">Loading…</div>
+  <hr>
+<div id="board" hidden>
+  <h2>Mission <span id="missionNo"></span> – Leader: <span id="leaderName"></span></h2>
+
+  <!-- leader view -->
+  <div id="leaderPanel" hidden>
+    <p>Select <span id="needed"></span> teammates:</p>
+    <div id="playersChecklist"></div>
+    <button id="proposeBtn" disabled>Propose team</button>
+  </div>
+
+  <!-- non-leader & after propose -->
+  <div id="votePanel" hidden>
+    <p id="teamList"></p>
+    <button id="approveBtn">Approve</button>
+    <button id="rejectBtn">Reject</button>
+  </div>
+
+  <p id="status"></p>
+</div>
   <button id="continue" hidden>Continue</button>
 </body></html>
