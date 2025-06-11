@@ -54,6 +54,38 @@ contBtn.onclick = () => {
   renderBoard();
 };
 
+/* ---------- vote finaliser ---------- */
+async function maybeFinalizeVote() {
+  if (!data) return;
+
+  const totalPlayers = Object.keys(data.players).length;
+  const votesSoFar   = data.votes ? Object.keys(data.votes).length : 0;
+
+  // Wait until every player has cast a vote
+  if (votesSoFar < totalPlayers) return;
+
+  // Who should write the result? Let the leader do it
+  if (me !== data.leaderUid) return;
+
+  // Count approvals
+  const approvals = Object.values(data.votes).filter(v => v).length;
+  const approved  = approvals > totalPlayers / 2;   // simple majority
+
+  if (approved) {
+    await updateDoc(roomRef, {
+      phase: "mission",
+      missionLeader: data.leaderUid,
+      currentTeam: data.proposedTeam,
+      votesResult: "approved",
+      lastActivity: serverTimestamp()
+    });
+  } else {
+    // TODO: handle rejection, rotate leader, increment voteRound,
+    //       spies win if voteRound > 5
+  }
+}
+
+
 /* ---------- main board renderer ---------- */
 function renderBoard(){
   missionNo.textContent = data.mission;
@@ -62,7 +94,8 @@ function renderBoard(){
   const playersArr = Object.entries(data.players); // [uid,nick]
 
   /* --- Leader view (only until a team is proposed) --- */
-  if (me === data.leaderUid && data.proposedTeam.length === 0) {
+  const teamExists = Array.isArray(data.proposedTeam) && data.proposedTeam.length > 0;
+  if (me === data.leaderUid && !teamExists) {
     leaderPan.hidden = false;
     votePan.hidden   = true;
     const teamSize = missionTeamSize(playersArr.length, data.mission);
@@ -95,7 +128,7 @@ function renderBoard(){
     };
   }
   /* --- Voting view --- */
-  else if (data.proposedTeam.length){
+  else if (teamExists){
     leaderPan.hidden = true;
     votePan.hidden   = false;
     teamList.textContent = `Proposed team: ${
@@ -118,6 +151,12 @@ function renderBoard(){
     const yes = Object.values(data.votes).filter(v=>v).length;
     const total = Object.keys(data.players).length;
     statusP.textContent = `Votes so far: ${yes}/${total} approve`;
+  }
+
+  if (data.votesResult === "approved") {
+    statusP.textContent = "Team approved! (Mission phase coming next…)";
+    leaderPan.hidden = votePan.hidden = true;
+    return;                   // nothing else to show for now
   }
 }
 
@@ -144,5 +183,5 @@ async function castVote(approve){
 
 /* ---------- keep board live ---------- */
 onSnapshot(roomRef, snap => {
-  if (!board.hidden){ data = snap.data(); renderBoard(); }
+  if (!board.hidden){ data = snap.data(); renderBoard(); maybeFinalizeVote()}
 });
