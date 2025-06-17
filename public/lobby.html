@@ -1,18 +1,25 @@
-<!DOCTYPE html><html><head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>The Resistance – Join Room</title>
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>The Resistance – Lobby</title>
 
-  <script type="module" src="https://www.gstatic.com/firebasejs/11.9.0/firebase-app.js"></script>
-  <script type="module" src="https://www.gstatic.com/firebasejs/11.9.0/firebase-auth.js"></script>
-  <script type="module" src="https://www.gstatic.com/firebasejs/11.9.0/firebase-firestore.js"></script>
+    <script type="module" src="https://www.gstatic.com/firebasejs/11.9.0/firebase-app.js"></script>
+    <script type="module" src="https://www.gstatic.com/firebasejs/11.9.0/firebase-auth.js"></script>
+    <script type="module" src="https://www.gstatic.com/firebasejs/11.9.0/firebase-firestore.js"></script>
 
-  <!-- shared init -->
-  <script type="module" src="/js/firebase-init.js"></script>
-  <!-- page-specific script -->
-  <script type="module" src="/js/lobby.js"></script>
+    <script type="module" src="/js/firebase-init.js"></script>
+    <script type="module" src="/js/lobby.js"></script>
 </head>
 <body>
-  <h1 id="title">Lobby</h1>
-  <div id="root"></div>
-</body></html>
+    <h1 id="title">Lobby</h1>
+    
+    <div id="root">
+        <h3>Players:</h3>
+        <ul id="player-list"></ul>
+        <div id="start-game-container"></div>
+    </div>
+
+</body>
+</html>

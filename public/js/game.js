@@ -80,11 +80,33 @@ async function maybeFinalizeVote() {
       lastActivity: serverTimestamp()
     });
   } else {
-    // TODO: handle rejection, rotate leader, increment voteRound,
-    //       spies win if voteRound > 5
+    const playerUids = Object.keys(data.players);
+    const currentIdx = playerUids.indexOf(data.leaderUid);
+    const nextLeader = playerUids[(currentIdx + 1) % playerUids.length];
+    const nextRound  = (data.voteRound || 1) + 1;
+
+    // If five failed votes, spies win
+    if (nextRound > 5) {
+      await updateDoc(roomRef, {
+        phase: "spiesWin",
+        votesResult: "rejected",
+        voteRound: nextRound,
+        lastActivity: serverTimestamp()
+      });
+      return;
+    }
+
+    // otherwise rotate leader and start a new vote
+    await updateDoc(roomRef, {
+      votesResult: "rejected",
+      voteRound: nextRound,
+      leaderUid: nextLeader,
+      proposedTeam: [],
+      votes: {},
+      lastActivity: serverTimestamp()
+    });
   }
 }
-
 
 /* ---------- main board renderer ---------- */
 function renderBoard(){
@@ -157,6 +179,19 @@ function renderBoard(){
     statusP.textContent = "Team approved! (Mission phase coming next…)";
     leaderPan.hidden = votePan.hidden = true;
     return;                   // nothing else to show for now
+  }
+
+  if (data.votesResult === "rejected") {
+    statusP.textContent =
+      `Team rejected – new leader is ${uidName(data.leaderUid)}`;
+    leaderPan.hidden = votePan.hidden = true;
+    return;
+  }
+
+  if (data.phase === "spiesWin") {
+    statusP.textContent = "Five rejected votes – SPIES WIN!";
+    leaderPan.hidden = votePan.hidden = true;
+    return;
   }
 }
 
