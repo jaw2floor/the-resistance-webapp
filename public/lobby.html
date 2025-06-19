@@ -1,25 +1,53 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>The Resistance – Lobby</title>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>The Resistance – Lobby</title>
 
-    <script type="module" src="https://www.gstatic.com/firebasejs/11.9.0/firebase-app.js"></script>
-    <script type="module" src="https://www.gstatic.com/firebasejs/11.9.0/firebase-auth.js"></script>
-    <script type="module" src="https://www.gstatic.com/firebasejs/11.9.0/firebase-firestore.js"></script>
+  <link rel="stylesheet" href="/css/style.css">
 
-    <script type="module" src="/js/firebase-init.js"></script>
-    <script type="module" src="/js/lobby.js"></script>
+  <!-- Firebase SDKs -->
+  <script type="module" src="https://www.gstatic.com/firebasejs/11.9.0/firebase-app.js"></script>
+  <script type="module" src="https://www.gstatic.com/firebasejs/11.9.0/firebase-auth.js"></script>
+  <script type="module" src="https://www.gstatic.com/firebasejs/11.9.0/firebase-firestore.js"></script>
+
+  <!-- Your code -->
+  <script type="module" src="/js/firebase-init.js"></script>
+  <script type="module" src="/js/lobby.js"></script>
+
+  <!-- Tiny helper styles (optional-but-nice) -->
+  <style>
+    /* You can move these into style.css later */
+    #root.loading #lobby-content { display: none; }
+    #root.loaded  #loading       { display: none; }
+    #loading      { margin: 1rem 0; font-style: italic; }
+    .actions      { margin-top: 1.5rem; }
+    button#copy-invite-btn { margin-left: 1rem; }
+  </style>
 </head>
 <body>
+
+  <!-- Root starts in “loading” state -->
+  <div id="root" class="loading">
     <h1 id="title">Lobby</h1>
-    
-    <div id="root">
-        <h3>Players:</h3>
-        <ul id="player-list"></ul>
+
+    <!-- Loader -->
+    <p id="loading">Loading lobby, please wait…</p>
+
+    <!-- Real lobby UI -->
+    <div id="lobby-content">
+      <h3>Players:</h3>
+      <ul id="player-list"></ul>
+
+      <div class="actions">
         <div id="start-game-container"></div>
+        <button id="copy-invite-btn">Copy Invite Link</button>
+      </div>
     </div>
+  </div>
+
+  <div id="notification-container"></div>
 
 </body>
 </html>

@@ -1,43 +1,80 @@
-<!DOCTYPE html><html><head>
+<!DOCTYPE html>
+<html lang="en">
+<head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>The Resistance – Role</title>
+  <title>The Resistance – Game</title>
+
+  <!-- Main stylesheet -->
+  <link rel="stylesheet" href="/css/style.css" />
 
   <!-- Firebase SDKs -->
   <script type="module" src="https://www.gstatic.com/firebasejs/11.9.0/firebase-app.js"></script>
   <script type="module" src="https://www.gstatic.com/firebasejs/11.9.0/firebase-auth.js"></script>
   <script type="module" src="https://www.gstatic.com/firebasejs/11.9.0/firebase-firestore.js"></script>
+
+  <!-- Your code -->
   <script type="module" src="/js/firebase-init.js"></script>
   <script type="module" src="/js/game.js"></script>
+</head>
 
-  <style>
-    body { font-family: sans-serif; text-align:center; padding:3rem }
-    #role { font-size:2rem; margin:2rem 0 }
-    .spy { color:#c62828; }
-    .resistance { color:#1565c0; }
-  </style>
-</head><body>
-  <h1>The Resistance</h1>
-  <div id="role">Loading…</div>
-  <hr>
-<div id="board" hidden>
-  <h2>Mission <span id="missionNo"></span> – Leader: <span id="leaderName"></span></h2>
+<body>
 
-  <!-- leader view -->
-  <div id="leaderPanel" hidden>
-    <p>Select <span id="needed"></span> teammates:</p>
-    <div id="playersChecklist"></div>
-    <button id="proposeBtn" disabled>Propose team</button>
+  <!-- Root starts in “loading” state -->
+  <div id="root" class="loading">
+    <h1 id="title">The Resistance</h1>
+
+    <!-- Loader ----------------------------------------------------------------->
+    <p id="loading">Loading…</p>
+
+    <!-- Real game UI ----------------------------------------------------------->
+    <div id="game-content">
+
+      <!-- ROLE-REVEAL SCREEN -->
+      <p id="role"></p>
+      <button id="continue" hidden>Continue</button>
+
+      <!-- MAIN GAME BOARD (hidden until Continue is clicked) -->
+      <section id="board" hidden>
+
+        <!-- Mission / Leader header -->
+        <h3>Mission <span id="missionNo">1</span></h3>
+        <p>Leader: <strong id="leaderName"></strong></p>
+
+        <!-- Mission history track -->
+        <div id="mission-results"></div>
+
+        <!-- STATUS / INFO line -->
+        <p id="status"></p>
+
+        <!-- ─── Leader picks the team ─────────────────────────────────────── -->
+        <div id="leaderPanel" hidden>
+          <p>Select <span id="needed"></span> players for the mission:</p>
+          <div id="playersChecklist"></div>
+          <button id="proposeBtn" disabled>Propose Team</button>
+        </div>
+
+        <!-- ─── Everyone votes on the team ────────────────────────────────── -->
+        <div id="votePanel" hidden>
+          <p id="teamList"></p>
+          <button id="approveBtn">Approve ✔️</button>
+          <button id="rejectBtn">Reject ✖️</button>
+        </div>
+
+        <!-- ─── Mission execution (team members only) ─────────────────────── -->
+        <div id="missionPanel" hidden>
+          <p id="missionTeamText"></p>
+          <button id="succeedBtn" hidden>Succeed ✅</button>
+          <button id="failBtn"    hidden>Fail ❌</button>
+        </div>
+
+      </section>
+      <!-- /#board -->
+
+    </div>
+    <!-- /#game-content -->
   </div>
+  <!-- /#root -->
 
-  <!-- non-leader & after propose -->
-  <div id="votePanel" hidden>
-    <p id="teamList"></p>
-    <button id="approveBtn">Approve</button>
-    <button id="rejectBtn">Reject</button>
-  </div>
-
-  <p id="status"></p>
-</div>
-  <button id="continue" hidden>Continue</button>
-</body></html>
+</body>
+</html>

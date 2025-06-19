@@ -45,6 +45,8 @@ onAuthStateChanged(auth, user => {
         location.href = `/game.html?room=${roomId}`;
         return;
       }
+      root.classList.remove("loading");
+      root.classList.add("loaded");
 
       // Update the UI with the latest data
       renderLobby(roomData);
@@ -61,6 +63,8 @@ onAuthStateChanged(auth, user => {
 
 
 function renderLobby(data) {
+  const loading = document.querySelector("#loading");
+  if (loading) loading.remove();        // or loading.style.display = "none";
   // Update lobby title
   title.textContent = `Lobby: ${data.name}`;
 
