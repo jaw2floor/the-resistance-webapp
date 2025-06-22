@@ -109,9 +109,10 @@ async function startGame(players) {
   });
 
   try {
-    await updateDoc(roomRef, {
+    await updateDoc(roomRef, {    
       roles,
       phase: "roleReveal",
+      started: true,
       lastActivity: serverTimestamp(),
       mission: 1,
       voteRound: 1,
@@ -127,12 +128,12 @@ async function startGame(players) {
 
 
 /* --- auto-remove on close --- */
-function leave() {
-  if (!myUid) return;
+//function leave() {
+//  if (!myUid) return;
   // This update is sent without waiting, as the page is closing.
-  updateDoc(roomRef, {
-    [`players.${myUid}`]: deleteField(),
-    lastActivity: serverTimestamp()
-  }).catch(() => {});
-}
-addEventListener("pagehide", leave);
+//  updateDoc(roomRef, {
+//    [`players.${myUid}`]: deleteField(),
+//    lastActivity: serverTimestamp()
+//  }).catch(() => {});
+
+//addEventListener("pagehide", leave);
