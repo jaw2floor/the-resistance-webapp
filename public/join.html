@@ -1,18 +1,114 @@
-<!DOCTYPE html><html><head>
+<!DOCTYPE html>
+<html lang="en">
+<head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>The Resistance – Join Room</title>
+  <title>The Resistance – Home</title>
+
+  <link rel="stylesheet" href="/css/style.css" />
+
+  <style>
+    /* Gate while Firebase initialises */
+    #root.loading  #home-content { display:none; }
+    #root.loaded   #loading      { display:none; }
+
+    /* Section headings */
+    h2{ margin:1.5rem 0 .75rem; font-weight:600; }
+
+    /* NEW: Style for the "Create a Room" container */
+    .create-room-box {
+      border: 1px solid #dcdcdc; /* A soft grey is less harsh than pure black */
+      border-radius: var(--radius); /* Use the existing variable for consistency */
+      padding: 1rem 1.25rem 1.25rem;
+      background-color: #fcfcfc; /* A very slight off-white to lift it from the page */
+    }
+    
+    /* Tweak heading margins inside the new box */
+    .create-room-box h2 {
+      margin-top: 0.25rem;
+      margin-bottom: 1.25rem;
+    }
+
+    /* Create‑room form fields */
+    .field{
+      width:100%;
+      padding:.75rem 1rem;
+      margin-bottom:.9rem;
+      font-size:1rem;
+      border:1px solid #ccc;
+      border-radius:var(--radius);
+      transition:border .2s;
+    }
+    .field:focus{
+      outline:none;
+      border-color:var(--c-primary);
+      box-shadow:0 0 0 3px rgba(0,102,255,.15);
+    }
+    #createBtn{ width:100%; }
+
+    /* Room list */
+    #roomsList{ list-style:none; padding:0; margin-top:0; }
+    .room-card{
+      display:flex;
+      justify-content:space-between;
+      align-items:center;
+      padding:.9rem 1rem;
+      margin-bottom:.75rem;
+      background:#f7f8fa;
+      border:1px solid #e0e0e0;
+      border-radius:var(--radius);
+      cursor:pointer;
+      transition: background .2s, border-color .2s;
+    }
+    .room-card:hover{ 
+        background:#eef2ff; 
+        border-color: #c7d2fe;
+    }
+    .room-name{ font-weight:600; }
+    .room-meta{ font-size:.85rem; color:#555; }
+    
+    /* Join form that appears inside a room card */
+    .join-form {
+      margin-top: 0.75rem;
+      padding-top: 0.75rem;
+      border-top: 1px solid #ddd;
+      width: 100%;
+      display: flex;
+      gap: 0.5rem;
+    }
+    .join-form input { flex-grow: 1; }
+
+  </style>
 
   <script type="module" src="https://www.gstatic.com/firebasejs/11.9.0/firebase-app.js"></script>
   <script type="module" src="https://www.gstatic.com/firebasejs/11.9.0/firebase-auth.js"></script>
   <script type="module" src="https://www.gstatic.com/firebasejs/11.9.0/firebase-firestore.js"></script>
 
-  <!-- shared init -->
   <script type="module" src="/js/firebase-init.js"></script>
-  <!-- page-specific script -->
   <script type="module" src="/js/join.js"></script>
 </head>
 <body>
-  <h1 id="title">Join a Room</h1>
-  <div id="root"></div>
-</body></html>
+  <div id="root" class="loading">
+    <h1>The Resistance</h1>
+
+    <p id="loading">Finding available games…</p>
+
+    <div id="home-content">
+      
+      <div class="create-room-box">
+        <h2>Create a Room</h2>
+        <input type="text" id="roomName" class="field" placeholder="Room name" maxlength="24" />
+        <input type="text" id="nickname" class="field" placeholder="Your nickname" maxlength="18" />
+        <button id="createBtn" disabled>Create Room</button>
+      </div>
+
+      <section id="rooms-section">
+        <h2>Available Rooms</h2>
+        <ul id="roomsList"></ul>
+        <p id="noRoomsMsg" style="display:none; color:#555;">No rooms yet — create one above!</p>
+      </section>
+
+    </div>
+  </div>
+</body>
+</html>

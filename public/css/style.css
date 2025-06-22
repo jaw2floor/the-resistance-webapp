@@ -1,5 +1,28 @@
 /* /public/css/style.css */
 
+/* ─── 1. GLOBAL RESET + DESIGN TOKENS ──────────────────────────── */
+:root{
+  /* Brand colours */
+  --c-bg:#f7f8fa;
+  --c-primary:#0066ff;
+  --c-primary-dark:#0047b3;
+  --c-success:#28a745;
+  --c-danger:#d32f2f;
+
+  /* Neutrals & helpers */
+  --radius:8px;
+  --shadow:0 4px 12px rgba(0,0,0,.08);
+}
+
+/* A very small “reset” */
+*,*::before,*::after{ box-sizing:border-box; margin:0; padding:0; }
+
+body{
+  background:var(--c-bg);
+  color:#222;
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  line-height:1.5;
+}
 /* --- General Styles --- */
 body {
     font-family: sans-serif;
@@ -12,13 +35,55 @@ body {
     margin: 0;
 }
 
-#root {
-    background: white;
-    padding: 2rem;
-    border-radius: 8px;
-    box-shadow: 0 4px 12px rgba(0,0,0,0.1);
-    min-width: 350px;
-    text-align: center;
+/* ─── 2. ROOT CONTAINER ────────────────────────────────────────── */
+#root{
+  width:100%;
+  max-width:420px;          /* looks good on tablets, too           */
+  margin:auto;              /* centres the card horizontally        */
+  background:white;
+  padding:1.5rem;
+  border-radius:var(--radius);
+  box-shadow:var(--shadow);
+  text-align:center;
+}
+/* ─── 3. BOARD LAYOUT ─────────────────────────────────────────── */
+#board{
+  display:flex;
+  flex-direction:column;        /* default = vertical for phones  */
+  gap:1.25rem;                  /* space between inner blocks     */
+  margin-top:1rem;
+}
+/* ─── 4. MISSION HISTORY “CHIPS” ──────────────────────────────── */
+#mission-results{
+  display:flex;
+  gap:.5rem;
+  justify-content:center;
+  flex-wrap:wrap;      /* wraps on small screens */
+}
+
+.mission-chip{
+  width:40px;
+  height:40px;
+  border-radius:50%;
+  display:grid;            /* perfect centering */
+  place-content:center;
+  font-weight:bold;
+  font-size:.9rem;
+  background:#e0e0e0;      /* neutral until result known */
+  color:#333;
+}
+
+/* Colour swaps once a result is set */
+.mission-chip.success{ background:var(--c-success); color:#fff; }
+.mission-chip.fail   { background:var(--c-danger);  color:#fff; }
+
+
+
+@media (min-width:600px){       /* ≈ small tablets and up         */
+  #board{
+    flex-direction:row;         /* now side-by-side               */
+    align-items:flex-start;
+  }
 }
 
 /* --- Loading Indicator Style --- */
@@ -45,34 +110,32 @@ body {
 /* NEW: Style for highlighting the current user */
 #player-list li.me {
     font-weight: bold;
-    color: #0056b3;
+    color: var(--c-primary-dark);
     background-color: #dbeaff;
-    border: 1px solid #007bff;
+    border: 1px solid var(--c-primary);
 }
 
 /* --- Button Styles --- */
-button {
-    background-color: #007bff;
-    color: white;
-    border: none;
-    padding: 12px 20px;
-    border-radius: 5px;
-    font-size: 1rem;
-    cursor: pointer;
-    transition: background-color 0.2s;
+button{
+  background:var(--c-primary);
+  color:#fff;
+  border:none;
+  padding:12px 20px;
+  border-radius:5px;
+  font-size:1rem;
+  cursor:pointer;
+  transition:background .2s;
 }
-
-button:disabled {
-    background-color: #aaa;
-    cursor: not-allowed;
+button:hover:not(:disabled){
+  background:var(--c-primary-dark);
 }
-
-button:hover:not(:disabled) {
-    background-color: #0056b3;
+button:disabled{
+  background:#aaa;          /* keep as literal grey for clarity */
+  cursor:not-allowed;
 }
 
 #copy-invite-btn {
-    background-color: #28a745;
+    background-color: var(--c-success);
     margin-top: 10px;
 }
 #copy-invite-btn:hover {
@@ -113,4 +176,15 @@ button:hover:not(:disabled) {
 /* 2️⃣  After the first snapshot (JS sets root.loaded) … */
 #root.loaded   #loading {                /* hide the spinner  */
   display: none;
+}
+/* ───  Utility “state” colours ────────────────────────────────── */
+.success{               /* ✓ green things (passed missions, OK toasts…) */
+  background:var(--c-success);
+  color:#fff;
+}
+
+.danger,
+.fail{                  /* ✗ red things (failed missions, error toasts…) */
+  background:var(--c-danger);
+  color:#fff;
 }

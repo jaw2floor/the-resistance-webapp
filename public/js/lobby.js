@@ -1,139 +1,210 @@
-/* /public/js/lobby.js – REVISED */
 import { db, auth } from "./firebase-init.js";
 import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.9.0/firebase-auth.js";
 import { doc, onSnapshot, updateDoc, deleteField, serverTimestamp } from "https://www.gstatic.com/firebasejs/11.9.0/firebase-firestore.js";
 
-/* --- leave-confirm prompt --- */
-window.addEventListener("beforeunload", e => { e.preventDefault(); e.returnValue = ""; });
-
-/* --- params & refs --- */
-const roomId = new URLSearchParams(location.search).get("room");
-if (!roomId) location.href = "/join.html";
-const roomRef = doc(db, "rooms", roomId);
-
-let myUid = null;
-let unsubscribeFromRoom = null; // To hold the listener so we can detach it
-
-/* --- elements --- */
-const title = document.querySelector("#title");
-const playerList = document.querySelector("#player-list");
-const startContainer = document.querySelector("#start-game-container");
-const root = document.querySelector("#root");
-
-
-/* --- main auth listener --- */
-onAuthStateChanged(auth, user => {
-  if (user) {
-    // User is signed in
-    myUid = user.uid;
-
-    // Detach any existing listener before creating a new one
-    if (unsubscribeFromRoom) {
-      unsubscribeFromRoom();
-    }
-
-    // Attach the live listener for the room
-    unsubscribeFromRoom = onSnapshot(roomRef, snap => {
-      if (!snap.exists()) {
-        root.innerHTML = "<h2>This room has been deleted.</h2><a href='/join.html'>Find another room</a>";
-        return;
-      }
-      const roomData = snap.data();
-
-      // Check if the game has started and redirect if needed
-      if (roomData.phase === "roleReveal") {
-        location.href = `/game.html?room=${roomId}`;
-        return;
-      }
-      root.classList.remove("loading");
-      root.classList.add("loaded");
-
-      // Update the UI with the latest data
-      renderLobby(roomData);
-    });
-  } else {
-    // User is signed out
-    myUid = null;
-    if (unsubscribeFromRoom) {
-      unsubscribeFromRoom();
-    }
-    root.innerHTML = "<h2>You must be signed in to join a room.</h2>";
-  }
+// --- Leave-confirm prompt ---
+// This is a good "best effort" to prevent accidental leaving.
+window.addEventListener("beforeunload", e => {
+    e.preventDefault();
+    e.returnValue = "Are you sure you want to leave the lobby?";
 });
 
-
-function renderLobby(data) {
-  const loading = document.querySelector("#loading");
-  if (loading) loading.remove();        // or loading.style.display = "none";
-  // Update lobby title
-  title.textContent = `Lobby: ${data.name}`;
-
-  // Update player list
-  playerList.innerHTML = ""; // Clear only the list
-  Object.values(data.players).forEach(nick => {
-    const li = document.createElement("li");
-    li.textContent = nick;
-    playerList.appendChild(li);
-  });
-
-  // Manage the "Start Game" button for the room creator
-  startContainer.innerHTML = ""; // Clear just the button container
-  if (myUid === data.createdBy) {
-    const btn = document.createElement("button");
-    btn.id = "startBtn";
-    const playerCount = Object.keys(data.players).length;
-    btn.disabled = playerCount < 5;
-    btn.textContent = btn.disabled ? `Need at least 5 players (${playerCount}/5)` : "Start Game";
-    btn.onclick = () => startGame(data.players);
-    startContainer.appendChild(btn);
-  }
+// --- Params & Refs ---
+const roomId = new URLSearchParams(location.search).get("room");
+if (!roomId) {
+    // Redirect immediately if there's no room ID
+    location.href = "/join.html";
 }
+const roomRef = doc(db, "rooms", roomId);
 
-/* --- start game function (remains the same) --- */
-async function startGame(players) {
-  // ... your existing startGame function logic is fine
-  const spiesByPlayerCount = { 5: 2, 6: 2, 7: 3, 8: 3, 9: 3, 10: 4 };
-  const uids = Object.keys(players);
-  const n = uids.length;
-  const spiesNeeded = spiesByPlayerCount[n];
+// --- Cached State ---
+let me = null; // To store the current user's UID
+let roomCreatorId = null; // To store the creator's UID
+let unsubscribeFromRoom = null; // To hold the listener so we can detach it
 
-  if (spiesNeeded === undefined) {
-    alert(`Error: Cannot start a game with ${n} players.`);
-    return;
-  }
+// --- Elements ---
+const root = document.getElementById("root");
+const titleEl = document.getElementById("title");
+const playerListEl = document.getElementById("player-list");
+const startContainerEl = document.getElementById("start-game-container");
+const copyInviteBtn = document.getElementById("copy-invite-btn");
 
-  uids.sort(() => Math.random() - 0.5);
-  const roles = {};
-  uids.forEach((uid, i) => {
-    roles[uid] = i < spiesNeeded ? "spy" : "resistance";
-  });
+// --- Main Auth Listener ---
+onAuthStateChanged(auth, (user) => {
+    if (user) {
+        // User is signed in.
+        me = user.uid;
+        
+        // If we don't have a listener yet, create one.
+        if (!unsubscribeFromRoom) {
+            listenToRoomUpdates();
+        }
+        
+        // Also handle the "best effort" cleanup when the user closes the tab.
+        window.addEventListener("pagehide", leaveLobby);
 
-  try {
-    await updateDoc(roomRef, {    
-      roles,
-      phase: "roleReveal",
-      started: true,
-      lastActivity: serverTimestamp(),
-      mission: 1,
-      voteRound: 1,
-      leaderUid: uids[0],
-      proposedTeam: [],
-      votes: {},
+    } else {
+        // User is signed out.
+        me = null;
+        
+        // Clean up the listener if it exists.
+        if (unsubscribeFromRoom) {
+            unsubscribeFromRoom();
+            unsubscribeFromRoom = null;
+        }
+        window.removeEventListener("pagehide", leaveLobby);
+
+        root.innerHTML = "<h2>You must be signed in to join a room.</h2><p><a href='/join.html'>Back to safety</a></p>";
+        root.classList.remove("loading");
+    }
+});
+
+/**
+ * Attaches a Firestore listener to the room and handles UI updates.
+ */
+function listenToRoomUpdates() {
+    unsubscribeFromRoom = onSnapshot(roomRef, (snap) => {
+        if (!snap.exists()) {
+            // Room has been deleted.
+            if (unsubscribeFromRoom) unsubscribeFromRoom(); // Clean up the listener
+            root.innerHTML = "<h2>This room no longer exists.</h2><a href='/join.html'>Find another room</a>";
+            return;
+        }
+        
+        const data = snap.data();
+        
+        // Check if the game has started and redirect if so.
+        // This is a crucial piece of logic.
+        if (data.phase && data.phase !== 'lobby') {
+            location.href = `/game.html?room=${roomId}`;
+            return; // Stop processing to avoid errors during redirect.
+        }
+        
+        // Store the creator's ID for later checks.
+        roomCreatorId = data.createdBy;
+        
+        // Initial load is done, show the UI.
+        root.classList.remove("loading");
+        root.classList.add("loaded");
+        
+        // Update the UI with the latest data.
+        renderLobby(data);
+    }, (error) => {
+        console.error("Error listening to room:", error);
+        root.innerHTML = "<h2>Error connecting to the lobby.</h2>";
     });
-  } catch (error) {
-    console.error("Failed to start game:", error);
-    alert("Failed to start the game. Please check the developer console for errors.");
-  }
 }
 
+/**
+ * Re-draws the lobby UI based on fresh data from Firestore.
+ * @param {object} data - The room document data.
+ */
+function renderLobby(data) {
+    // Update lobby title
+    titleEl.textContent = `Lobby: ${data.name}`;
 
-/* --- auto-remove on close --- */
-//function leave() {
-//  if (!myUid) return;
-  // This update is sent without waiting, as the page is closing.
-//  updateDoc(roomRef, {
-//    [`players.${myUid}`]: deleteField(),
-//    lastActivity: serverTimestamp()
-//  }).catch(() => {});
+    // Update player list
+    playerListEl.innerHTML = ""; // Clear existing list
+    Object.values(data.players).forEach(nick => {
+        const li = document.createElement("li");
+        li.textContent = nick;
+        playerListEl.appendChild(li);
+    });
 
-//addEventListener("pagehide", leave);
+    // Only show the "Start Game" button to the room creator
+    startContainerEl.innerHTML = ""; // Clear previous button
+    if (me === roomCreatorId) {
+        const playerCount = Object.keys(data.players).length;
+        const canStart = playerCount >= 5 && playerCount <= 10;
+        
+        const btn = document.createElement("button");
+        btn.id = "startBtn";
+        btn.disabled = !canStart;
+        btn.textContent = canStart ? "Start Game" : `Need 5-10 players (${playerCount} joined)`;
+        
+        if(canStart) {
+            btn.onclick = () => startGame(data.players);
+        }
+        
+        startContainerEl.appendChild(btn);
+    }
+}
+
+/**
+ * Assigns roles and updates the room document to start the game.
+ * @param {object} players - The players object from the room document.
+ */
+async function startGame(players) {
+    // --- This logic is solid, no major changes needed ---
+    const spiesByPlayerCount = { 5: 2, 6: 2, 7: 3, 8: 3, 9: 3, 10: 4 };
+    const uids = Object.keys(players);
+    const n = uids.length;
+    const spiesNeeded = spiesByPlayerCount[n];
+
+    if (spiesNeeded === undefined) {
+        alert(`Error: Cannot start a game with ${n} players.`);
+        return;
+    }
+
+    // Shuffle players to assign roles randomly
+    uids.sort(() => Math.random() - 0.5);
+    const roles = {};
+    uids.forEach((uid, i) => {
+        roles[uid] = i < spiesNeeded ? "spy" : "resistance";
+    });
+    
+    // Set the first leader randomly from the shuffled list
+    const firstLeader = uids[0];
+
+    try {
+        await updateDoc(roomRef, {    
+            roles,
+            phase: "roleReveal", // This will trigger the redirect on all clients
+            started: true,
+            lastActivity: serverTimestamp(),
+            // --- Game state initialization ---
+            mission: 1,
+            voteRound: 1,
+            leaderUid: firstLeader,
+            proposedTeam: [],
+            votes: {},
+            missionResults: {},
+        });
+    } catch (error) {
+        console.error("Failed to start game:", error);
+        alert("Failed to start the game. See console for details.");
+    }
+}
+
+/**
+ * Handles the "copy invite link" functionality.
+ */
+copyInviteBtn.onclick = () => {
+    navigator.clipboard.writeText(window.location.href).then(() => {
+        // Simple, non-blocking notification
+        const notif = document.createElement('div');
+        notif.className = 'notification';
+        notif.textContent = 'Invite link copied!';
+        document.getElementById('notification-container').appendChild(notif);
+        setTimeout(() => notif.remove(), 2500);
+    }).catch(err => {
+        console.error('Could not copy text: ', err);
+    });
+};
+
+
+/**
+ * Best-effort attempt to remove a player when they leave the page.
+ */
+function leaveLobby() {
+    if (!me || me !== roomCreatorId) { 
+        // Only non-creator players are removed. If the creator leaves, the room should be deleted.
+        // The most robust way to handle creator-leaving is with a Cloud Function or stale-room cleanup.
+        updateDoc(roomRef, {
+            [`players.${me}`]: deleteField(),
+            lastActivity: serverTimestamp()
+        }).catch(() => {}); // Fire-and-forget, it might fail.
+    }
+    // Note: If the creator leaves, a better system would be to delete the room.
+    // The `pagehide` event is unreliable, so we rely on stale room cleanup (see join.js notes).
+}

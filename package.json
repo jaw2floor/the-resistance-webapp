@@ -1,0 +1,24 @@
+{
+  "name": "the-resistance-webapp",
+  "version": "1.0.0",
+  "description": "Web game, based on The Resistance - social deduction",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/jaw2floor/the-resistance-webapp.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/jaw2floor/the-resistance-webapp/issues"
+  },
+  "homepage": "https://github.com/jaw2floor/the-resistance-webapp#readme",
+  "devDependencies": {
+    "vite": "^6.3.5"
+  }
+}
