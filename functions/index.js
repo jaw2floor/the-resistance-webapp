@@ -57,3 +57,52 @@ exports.leaveRoom = functions
       res.status(500).end();
     }
   });
+
+// Optional AI mission generator
+const fetch = require('node-fetch');
+
+exports.generateMissions = functions
+  .region('europe-west1')
+  .https.onRequest(async (req, res) => {
+    const theme = (req.body && req.body.theme) || req.query.theme;
+    if (!theme) {
+      res.status(400).send('theme required');
+      return;
+    }
+
+    const apiKey = process.env.OPENAI_API_KEY;
+    const fallback = [1,2,3,4,5].map(i => `${theme} mission ${i}`);
+
+    if (!apiKey) {
+      res.status(200).json({ missions: fallback });
+      return;
+    }
+
+    try {
+      const response = await fetch('https://api.openai.com/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${apiKey}`
+        },
+        body: JSON.stringify({
+          model: 'gpt-3.5-turbo',
+          messages: [
+            { role: 'system', content: 'You generate short mission descriptions for the board game The Resistance.' },
+            { role: 'user', content: `Generate 5 brief mission descriptions set in ${theme}. Return them as a JSON array.` }
+          ],
+          temperature: 0.7
+        })
+      });
+
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      const data = await response.json();
+      const text = data.choices?.[0]?.message?.content || '';
+      const match = text.match(/\[[\s\S]*\]/);
+      const missions = match ? JSON.parse(match[0]) : fallback;
+      res.status(200).json({ missions });
+    } catch (err) {
+      console.error(err);
+      res.status(200).json({ missions: fallback });
+    }
+  });

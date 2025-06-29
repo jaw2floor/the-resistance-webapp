@@ -61,6 +61,11 @@ body {
   flex-wrap:wrap;      /* wraps on small screens */
 }
 
+#missionDesc{
+  font-style: italic;
+  margin-bottom: .5rem;
+}
+
 .mission-chip{
   width:40px;
   height:40px;

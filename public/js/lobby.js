@@ -32,6 +32,7 @@ const titleEl = document.getElementById("title");
 const playerListEl = document.getElementById("player-list");
 const startContainerEl = document.getElementById("start-game-container");
 const copyInviteBtn = document.getElementById("copy-invite-btn");
+const themeInput = document.getElementById("themeInput");
 
 const handleVisibility = () => {
     if (document.visibilityState === "hidden") leaveLobby();
@@ -122,6 +123,8 @@ function renderLobby(data) {
     // Update lobby title
     titleEl.textContent = `Lobby: ${data.name}`;
 
+    themeInput.value = data.theme || "";
+
     // Update player list
     playerListEl.innerHTML = ""; // Clear existing list
     Object.entries(data.players).forEach(([uid, nick]) => {
@@ -131,9 +134,10 @@ function renderLobby(data) {
         playerListEl.appendChild(li);
     });
 
-    // Only show the "Start Game" button to the room creator
-    startContainerEl.innerHTML = ""; // Clear previous button
+    // Only show the theme field and start button to the room creator
+    startContainerEl.innerHTML = "";
     if (me === roomCreatorId) {
+        themeInput.style.display = "inline-block";
         const playerCount = Object.keys(data.players).length;
         const canStart = playerCount >= 5 && playerCount <= 10;
         
@@ -147,6 +151,8 @@ function renderLobby(data) {
         }
         
         startContainerEl.appendChild(btn);
+    } else {
+        themeInput.style.display = "none";
     }
 }
 
@@ -164,6 +170,28 @@ async function startGame(players) {
     if (spiesNeeded === undefined) {
         showToast(`Cannot start a game with ${n} players.`, "fail");
         return;
+    }
+
+    // Optional theme and AI-generated missions
+    const theme = themeInput.value.trim();
+    let missions = [];
+    if (theme) {
+        try {
+            const resp = await fetch('https://europe-west1-resistance-app-4aeb2.cloudfunctions.net/generateMissions', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ theme })
+            });
+            if (resp.ok) {
+                const json = await resp.json();
+                if (Array.isArray(json.missions)) missions = json.missions;
+            }
+        } catch (err) {
+            console.error('Mission generation failed', err);
+        }
+        if (missions.length === 0) {
+            missions = [1,2,3,4,5].map(i => `${theme} mission ${i}`);
+        }
     }
 
     // Shuffle players to assign roles randomly
@@ -188,6 +216,8 @@ async function startGame(players) {
                 roles,
                 phase: "roleReveal", // triggers redirect
                 started: true,
+                theme: theme || null,
+                missions,
                 lastActivity: serverTimestamp(),
                 mission: 1,
                 voteRound: 1,

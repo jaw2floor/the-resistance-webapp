@@ -42,6 +42,7 @@ test('cleanupStaleRooms deletes stale rooms', async () => {
   Module._load = (request, parent, isMain) => {
     if (request === 'firebase-admin') return adminMock;
     if (request === 'firebase-functions') return functionsMock;
+    if (request === 'node-fetch') return async () => {}; // unused in this test
     return originalLoad(request, parent, isMain);
   };
 
