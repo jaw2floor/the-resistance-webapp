@@ -1,12 +1,15 @@
 import { db, auth } from "./firebase-init.js";
+import { showToast } from "./toast.js";
 import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.9.0/firebase-auth.js";
 import { doc, onSnapshot, updateDoc, deleteField, serverTimestamp } from "https://www.gstatic.com/firebasejs/11.9.0/firebase-firestore.js";
 
 // --- Leave-confirm prompt ---
 // This is a good "best effort" to prevent accidental leaving.
+let confirmLeave = true;
 window.addEventListener("beforeunload", e => {
+    if (!confirmLeave) return;
     e.preventDefault();
-    e.returnValue = "Are you sure you want to leave the lobby?";
+    e.returnValue = "";
 });
 
 // --- Params & Refs ---
@@ -76,6 +79,7 @@ function listenToRoomUpdates() {
         // Check if the game has started and redirect if so.
         // This is a crucial piece of logic.
         if (data.phase && data.phase !== 'lobby') {
+            confirmLeave = false;
             location.href = `/game.html?room=${roomId}`;
             return; // Stop processing to avoid errors during redirect.
         }
@@ -142,7 +146,7 @@ async function startGame(players) {
     const spiesNeeded = spiesByPlayerCount[n];
 
     if (spiesNeeded === undefined) {
-        alert(`Error: Cannot start a game with ${n} players.`);
+        showToast(`Cannot start a game with ${n} players.`, "fail");
         return;
     }
 
@@ -157,7 +161,9 @@ async function startGame(players) {
     const firstLeader = uids[0];
 
     try {
-        await updateDoc(roomRef, {    
+        confirmLeave = false; // avoid unload prompt on redirect
+        showToast('Starting game...', 'success');
+        await updateDoc(roomRef, {
             roles,
             phase: "roleReveal", // This will trigger the redirect on all clients
             started: true,
@@ -172,7 +178,8 @@ async function startGame(players) {
         });
     } catch (error) {
         console.error("Failed to start game:", error);
-        alert("Failed to start the game. See console for details.");
+        showToast("Failed to start the game.", "fail");
+        confirmLeave = true;
     }
 }
 
@@ -181,12 +188,7 @@ async function startGame(players) {
  */
 copyInviteBtn.onclick = () => {
     navigator.clipboard.writeText(window.location.href).then(() => {
-        // Simple, non-blocking notification
-        const notif = document.createElement('div');
-        notif.className = 'notification';
-        notif.textContent = 'Invite link copied!';
-        document.getElementById('notification-container').appendChild(notif);
-        setTimeout(() => notif.remove(), 2500);
+        showToast('Invite link copied!', 'success');
     }).catch(err => {
         console.error('Could not copy text: ', err);
     });
