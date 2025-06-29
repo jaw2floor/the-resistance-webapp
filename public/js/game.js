@@ -1,7 +1,7 @@
 /* /public/js/game.js – Phase 3 with Mission Logic + mission‑chip renderer */
 import { db, auth } from "./firebase-init.js";
 import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.9.0/firebase-auth.js";
-import { doc, onSnapshot, updateDoc, deleteField, serverTimestamp } from "https://www.gstatic.com/firebasejs/11.9.0/firebase-firestore.js";
+import { doc, onSnapshot, updateDoc, serverTimestamp, Timestamp } from "https://www.gstatic.com/firebasejs/11.9.0/firebase-firestore.js";
 import { missionTeamSize } from "./utils.mjs";
 
 const roomId = new URLSearchParams(location.search).get("room");
@@ -58,9 +58,25 @@ onAuthStateChanged(auth, (u) => {
   maybeShowRole();
   if (u) {
     heartbeatTimer = setInterval(() => {
-      updateDoc(roomRef, { lastActivity: serverTimestamp() }).catch(() => {});
+      updateDoc(roomRef, {
+        lastActivity: serverTimestamp(),
+        expiresAt: Timestamp.fromMillis(Date.now() + 2 * 60 * 1000)
+      }).catch(() => {});
     }, 60000);
-    window.addEventListener("pagehide", () => clearInterval(heartbeatTimer));
+    window.addEventListener("pagehide", () => {
+      clearInterval(heartbeatTimer);
+      if (me) {
+        navigator.sendBeacon(`https://europe-west1-resistance-app-4aeb2.cloudfunctions.net/leaveRoom?roomId=${roomId}&uid=${me}`);
+      }
+    });
+    document.addEventListener("visibilitychange", () => {
+      if (document.visibilityState === "hidden") {
+        clearInterval(heartbeatTimer);
+        if (me) {
+          navigator.sendBeacon(`https://europe-west1-resistance-app-4aeb2.cloudfunctions.net/leaveRoom?roomId=${roomId}&uid=${me}`);
+        }
+      }
+    });
   } else {
     clearInterval(heartbeatTimer);
   }
