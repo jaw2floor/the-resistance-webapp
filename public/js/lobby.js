@@ -1,7 +1,7 @@
 import { db, auth } from "./firebase-init.js";
 import { showToast } from "./toast.js";
 import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.9.0/firebase-auth.js";
-import { doc, onSnapshot, updateDoc, deleteField, serverTimestamp } from "https://www.gstatic.com/firebasejs/11.9.0/firebase-firestore.js";
+import { doc, onSnapshot, updateDoc, deleteDoc, deleteField, serverTimestamp, Timestamp, runTransaction } from "https://www.gstatic.com/firebasejs/11.9.0/firebase-firestore.js";
 
 // --- Leave-confirm prompt ---
 // This is a good "best effort" to prevent accidental leaving.
@@ -33,6 +33,10 @@ const playerListEl = document.getElementById("player-list");
 const startContainerEl = document.getElementById("start-game-container");
 const copyInviteBtn = document.getElementById("copy-invite-btn");
 
+const handleVisibility = () => {
+    if (document.visibilityState === "hidden") leaveLobby();
+};
+
 // --- Main Auth Listener ---
 onAuthStateChanged(auth, (user) => {
     if (user) {
@@ -46,9 +50,13 @@ onAuthStateChanged(auth, (user) => {
         
         // Also handle the "best effort" cleanup when the user closes the tab.
         window.addEventListener("pagehide", leaveLobby);
+        document.addEventListener("visibilitychange", handleVisibility);
         // Keep the room marked as active while the player is viewing the lobby
         heartbeatTimer = setInterval(() => {
-            updateDoc(roomRef, { lastActivity: serverTimestamp() }).catch(() => {});
+            updateDoc(roomRef, {
+                lastActivity: serverTimestamp(),
+                expiresAt: Timestamp.fromMillis(Date.now() + 2 * 60 * 1000)
+            }).catch(() => {});
         }, 60000);
 
     } else {
@@ -61,6 +69,7 @@ onAuthStateChanged(auth, (user) => {
             unsubscribeFromRoom = null;
         }
         window.removeEventListener("pagehide", leaveLobby);
+        document.removeEventListener("visibilitychange", handleVisibility);
         clearInterval(heartbeatTimer);
 
         root.innerHTML = "<h2>You must be signed in to join a room.</h2><p><a href='/join.html'>Back to safety</a></p>";
@@ -170,18 +179,24 @@ async function startGame(players) {
     try {
         confirmLeave = false; // avoid unload prompt on redirect
         showToast('Starting game...', 'success');
-        await updateDoc(roomRef, {
-            roles,
-            phase: "roleReveal", // This will trigger the redirect on all clients
-            started: true,
-            lastActivity: serverTimestamp(),
-            // --- Game state initialization ---
-            mission: 1,
-            voteRound: 1,
-            leaderUid: firstLeader,
-            proposedTeam: [],
-            votes: {},
-            missionResults: {},
+        await runTransaction(db, async (tx) => {
+            const snap = await tx.get(roomRef);
+            if (!snap.exists() || snap.data().started) {
+                throw new Error('already started');
+            }
+            tx.update(roomRef, {
+                roles,
+                phase: "roleReveal", // triggers redirect
+                started: true,
+                lastActivity: serverTimestamp(),
+                mission: 1,
+                voteRound: 1,
+                leaderUid: firstLeader,
+                proposedTeam: [],
+                votes: {},
+                missionResults: {},
+                expiresAt: Timestamp.fromMillis(Date.now() + 2 * 60 * 1000)
+            });
         });
     } catch (error) {
         console.error("Failed to start game:", error);
@@ -212,8 +227,10 @@ function leaveLobby() {
         // The most robust way to handle creator-leaving is with a Cloud Function or stale-room cleanup.
         updateDoc(roomRef, {
             [`players.${me}`]: deleteField(),
-            lastActivity: serverTimestamp()
+            lastActivity: serverTimestamp(),
+            expiresAt: Timestamp.fromMillis(Date.now() + 60 * 1000)
         }).catch(() => {}); // Fire-and-forget, it might fail.
+        navigator.sendBeacon(`https://europe-west1-resistance-app-4aeb2.cloudfunctions.net/leaveRoom?roomId=${roomId}&uid=${me}`);
     }
     // Note: If the creator leaves, a better system would be to delete the room.
     // The `pagehide` event is unreliable, so we rely on stale room cleanup (see join.js notes).
