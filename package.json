@@ -4,7 +4,8 @@
   "description": "Web game, based on The Resistance - social deduction",
   "main": "index.js",
   "scripts": {
-    "test": "node --test"
+    "test": "node --test",
+    "build": "node build.js"
   },
   "repository": {
     "type": "git",
