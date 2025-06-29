@@ -18,6 +18,7 @@ const contBtn           = $("#continue");
 const board             = $("#board");
 const missionNo         = $("#missionNo");
 const leaderNm          = $("#leaderName");
+const missionDesc       = $("#missionDesc");
 const leaderPan         = $("#leaderPanel");
 const neededSP          = $("#needed");
 const checkBoxC         = $("#playersChecklist");
@@ -250,6 +251,7 @@ function renderBoard() {
 
   missionNo.textContent = data.mission;
   leaderNm.textContent  = uidName(data.leaderUid);
+  missionDesc.textContent = (data.missions && data.missions[data.mission - 1]) || '';
 
   /* ------------ render mission history chips ------------- */
   renderMissionTrack();
