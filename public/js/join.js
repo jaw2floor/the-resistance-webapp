@@ -28,6 +28,17 @@ if (savedNick) {
   nickname.value = savedNick;
   checkFields()
 }
+
+// If arriving via an invite link (?room=XYZ), auto-join that room.
+const invitedRoomId = new URLSearchParams(location.search).get("room");
+if (invitedRoomId) {
+  (async () => {
+    // Use saved nickname if available, otherwise prompt the player.
+    const nick = savedNick || prompt("Enter a nickname to join the game:");
+    if (!nick) return;
+    await joinRoom(invitedRoomId, nick.trim());
+  })();
+}
 function checkFields() {
   createBtn.disabled = !(roomName.value.trim() && nickname.value.trim());
 }
