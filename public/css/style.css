@@ -45,6 +45,13 @@ body {
   border-radius:var(--radius);
   box-shadow:var(--shadow);
   text-align:center;
+  opacity:0;                /* fade in once data loads */
+  transform:translateY(20px);
+  transition:opacity .4s ease, transform .4s ease;
+}
+#root.loaded{
+  opacity:1;
+  transform:translateY(0);
 }
 /* ─── 3. BOARD LAYOUT ─────────────────────────────────────────── */
 #board{
@@ -71,6 +78,7 @@ body {
   font-size:.9rem;
   background:#e0e0e0;      /* neutral until result known */
   color:#333;
+  transition:background-color .3s ease, transform .3s ease;
 }
 
 /* Colour swaps once a result is set */
