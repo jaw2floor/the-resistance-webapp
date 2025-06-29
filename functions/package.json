@@ -1,0 +1,9 @@
+{
+  "name": "cleanup-functions",
+  "description": "Cloud Functions for The Resistance Webapp",
+  "engines": {"node": "16"},
+  "dependencies": {
+    "firebase-admin": "^11.10.1",
+    "firebase-functions": "^4.4.1"
+  }
+}
