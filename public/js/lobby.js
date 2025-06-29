@@ -60,20 +60,10 @@ onAuthStateChanged(auth, (user) => {
         }, 60000);
 
     } else {
-        // User is signed out.
-        me = null;
-        
-        // Clean up the listener if it exists.
-        if (unsubscribeFromRoom) {
-            unsubscribeFromRoom();
-            unsubscribeFromRoom = null;
-        }
-        window.removeEventListener("pagehide", leaveLobby);
-        document.removeEventListener("visibilitychange", handleVisibility);
-        clearInterval(heartbeatTimer);
-
-        root.innerHTML = "<h2>You must be signed in to join a room.</h2><p><a href='/join.html'>Back to safety</a></p>";
-        root.classList.remove("loading");
+        // Initial auth state may be null while anonymous sign-in completes.
+        // Avoid showing an error immediately to allow the sign-in to finish.
+        // If sign-in truly fails, the user can refresh to retry.
+        return;
     }
 });
 
@@ -209,7 +199,8 @@ async function startGame(players) {
  * Handles the "copy invite link" functionality.
  */
 copyInviteBtn.onclick = () => {
-    navigator.clipboard.writeText(window.location.href).then(() => {
+    const joinLink = `${location.origin}/join.html?room=${roomId}`;
+    navigator.clipboard.writeText(joinLink).then(() => {
         showToast('Invite link copied!', 'success');
     }).catch(err => {
         console.error('Could not copy text: ', err);
