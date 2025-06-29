@@ -2,6 +2,7 @@
 import { db, auth } from "./firebase-init.js";
 import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.9.0/firebase-auth.js";
 import { doc, onSnapshot, updateDoc, deleteField, serverTimestamp } from "https://www.gstatic.com/firebasejs/11.9.0/firebase-firestore.js";
+import { missionTeamSize } from "./utils.mjs";
 
 const roomId = new URLSearchParams(location.search).get("room");
 const roomRef = doc(db, "rooms", roomId);
@@ -314,17 +315,6 @@ function renderBoard() {
 /* --------------------------------------------------------------------------- */
 /*                                 misc helpers                                */
 /* --------------------------------------------------------------------------- */
-function missionTeamSize(playerCount, mission) {
-  const tbl = {
-    5 : [0, 2, 3, 2, 3, 3],
-    6 : [0, 2, 3, 4, 3, 4],
-    7 : [0, 2, 3, 3, 4, 4],
-    8 : [0, 3, 4, 4, 5, 5],
-    9 : [0, 3, 4, 4, 5, 5],
-    10: [0, 3, 4, 4, 5, 5],
-  };
-  return tbl[playerCount][mission];
-}
 
 async function castVote(approve) {
   await updateDoc(roomRef, { [`votes.${me}`]: approve, lastActivity: serverTimestamp() });
