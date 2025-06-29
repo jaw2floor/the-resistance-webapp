@@ -1,6 +1,7 @@
 /* /public/js/join.js  —  redesigned home‑screen logic */
 
 import { db, auth } from "./firebase-init.js";
+import { showToast } from "./toast.js";
 import { onAuthStateChanged }
   from "https://www.gstatic.com/firebasejs/11.9.0/firebase-auth.js";
 import {
@@ -181,7 +182,7 @@ createBtn.onclick = async () => {
     location.href = `/lobby.html?room=${ref.id}`;
   } catch (error) {
     console.error("Failed to create room:", error);
-    alert("Could not create the room. Please try again.");
+    showToast("Could not create the room. Please try again.", "fail");
     // --- RESTORE BUTTON ON FAILURE ---
     createBtn.disabled = false;
     createBtn.textContent = "Create Room";
