@@ -9,6 +9,7 @@ const roomRef = doc(db, "rooms", roomId);
 
 /* ---------- cached state ---------- */
 let me, data;
+let heartbeatTimer = null;
 
 /* ---------- elements ---------- */
 const $ = (sel) => document.querySelector(sel);
@@ -55,6 +56,14 @@ function maybeShowRole() {
 onAuthStateChanged(auth, (u) => {
   me = u?.uid;
   maybeShowRole();
+  if (u) {
+    heartbeatTimer = setInterval(() => {
+      updateDoc(roomRef, { lastActivity: serverTimestamp() }).catch(() => {});
+    }, 60000);
+    window.addEventListener("pagehide", () => clearInterval(heartbeatTimer));
+  } else {
+    clearInterval(heartbeatTimer);
+  }
 });
 
 onSnapshot(roomRef, (snap) => {

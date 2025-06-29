@@ -24,6 +24,7 @@ const roomRef = doc(db, "rooms", roomId);
 let me = null; // To store the current user's UID
 let roomCreatorId = null; // To store the creator's UID
 let unsubscribeFromRoom = null; // To hold the listener so we can detach it
+let heartbeatTimer = null; // interval ID for activity pings
 
 // --- Elements ---
 const root = document.getElementById("root");
@@ -45,6 +46,10 @@ onAuthStateChanged(auth, (user) => {
         
         // Also handle the "best effort" cleanup when the user closes the tab.
         window.addEventListener("pagehide", leaveLobby);
+        // Keep the room marked as active while the player is viewing the lobby
+        heartbeatTimer = setInterval(() => {
+            updateDoc(roomRef, { lastActivity: serverTimestamp() }).catch(() => {});
+        }, 60000);
 
     } else {
         // User is signed out.
@@ -56,6 +61,7 @@ onAuthStateChanged(auth, (user) => {
             unsubscribeFromRoom = null;
         }
         window.removeEventListener("pagehide", leaveLobby);
+        clearInterval(heartbeatTimer);
 
         root.innerHTML = "<h2>You must be signed in to join a room.</h2><p><a href='/join.html'>Back to safety</a></p>";
         root.classList.remove("loading");
@@ -95,7 +101,7 @@ function listenToRoomUpdates() {
         renderLobby(data);
     }, (error) => {
         console.error("Error listening to room:", error);
-        root.innerHTML = "<h2>Error connecting to the lobby.</h2>";
+        root.innerHTML = "<h2>Error connecting to the lobby.</h2><p>Please check your connection and try again.</p>";
     });
 }
 
@@ -109,9 +115,10 @@ function renderLobby(data) {
 
     // Update player list
     playerListEl.innerHTML = ""; // Clear existing list
-    Object.values(data.players).forEach(nick => {
+    Object.entries(data.players).forEach(([uid, nick]) => {
         const li = document.createElement("li");
         li.textContent = nick;
+        if (uid === me) li.classList.add("me");
         playerListEl.appendChild(li);
     });
 
@@ -199,7 +206,8 @@ copyInviteBtn.onclick = () => {
  * Best-effort attempt to remove a player when they leave the page.
  */
 function leaveLobby() {
-    if (!me || me !== roomCreatorId) { 
+    clearInterval(heartbeatTimer);
+    if (!me || me !== roomCreatorId) {
         // Only non-creator players are removed. If the creator leaves, the room should be deleted.
         // The most robust way to handle creator-leaving is with a Cloud Function or stale-room cleanup.
         updateDoc(roomRef, {
