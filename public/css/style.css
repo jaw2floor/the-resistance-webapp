@@ -67,6 +67,10 @@ body {
   justify-content:center;
   flex-wrap:wrap;      /* wraps on small screens */
 }
+#three-container {
+  width:100%;
+  height:300px;
+}
 
 #missionDesc{
   font-style: italic;
