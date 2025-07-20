@@ -3,6 +3,7 @@ import { db, auth } from "./firebase-init.js";
 import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.9.0/firebase-auth.js";
 import { doc, onSnapshot, updateDoc, serverTimestamp, Timestamp } from "https://www.gstatic.com/firebasejs/11.9.0/firebase-firestore.js";
 import { missionTeamSize } from "./utils.mjs";
+import { init3DBoard, updateMission3D } from "./three-board.js";
 
 const roomId = new URLSearchParams(location.search).get("room");
 const roomRef = doc(db, "rooms", roomId);
@@ -10,6 +11,7 @@ const roomRef = doc(db, "rooms", roomId);
 /* ---------- cached state ---------- */
 let me, data;
 let heartbeatTimer = null;
+let threeInitialized = false;
 
 /* ---------- elements ---------- */
 const $ = (sel) => document.querySelector(sel);
@@ -29,6 +31,7 @@ const approveBt         = $("#approveBtn");
 const rejectBt          = $("#rejectBtn");
 const statusP           = $("#status");
 const missionResultsDiv = $("#mission-results"); // track container (row of chips)
+const threeContainer   = $("#three-container");
 
 // Mission panel elements
 const missionPan       = $("#missionPanel");
@@ -103,6 +106,10 @@ onSnapshot(roomRef, (snap) => {
 contBtn.onclick = () => {
   roleDiv.hidden = contBtn.hidden = true;
   board.hidden   = false;
+  if (!threeInitialized) {
+    init3DBoard(threeContainer);
+    threeInitialized = true;
+  }
   renderBoard();
 };
 
@@ -230,6 +237,7 @@ function renderMissionTrack() {
     }
 
     missionResultsDiv.appendChild(chip);
+    updateMission3D(i, result);
   }
 }
 
